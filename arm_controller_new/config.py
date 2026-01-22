@@ -30,3 +30,12 @@ WEB_PORT = 80
 
 # Motor aliases for API compatibility (x, y, z mapping to motor1, motor2, motor3)
 MOTOR_ALIASES = {'x': 'motor1', 'y': 'motor2', 'z': 'motor3'}
+
+# Coordinate mode settings
+# Motor angular positions (equilateral triangle layout, 120° apart)
+MOTOR_ANGLES = {'x': 0, 'y': 120, 'z': 240}
+
+# Step sizes for coordinate mode controls
+ROTATION_STEP_DEGREES = 15    # Degrees per rotation button press
+ELEVATION_STEP_UNITS = 10     # Elevation change per button press
+STEPS_PER_DEGREE = 5          # Motor steps per degree of tilt (tunable)
