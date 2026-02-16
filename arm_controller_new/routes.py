@@ -152,6 +152,7 @@ def handle_rotate(request):
             'success': True,
             'azimuth': position['azimuth'],
             'elevation': position['elevation'],
+            'slack_factor': position['slack_factor'],
             'deltas': deltas
         }))
 
@@ -184,6 +185,7 @@ def handle_tilt(request):
             'success': True,
             'azimuth': position['azimuth'],
             'elevation': position['elevation'],
+            'slack_factor': position['slack_factor'],
             'deltas': deltas
         }))
 
@@ -221,6 +223,7 @@ def handle_home(request):
             'success': True,
             'azimuth': position['azimuth'],
             'elevation': position['elevation'],
+            'slack_factor': position['slack_factor'],
             'deltas': deltas
         }))
 
@@ -845,6 +848,11 @@ HTML_INTERFACE = """<!DOCTYPE html>
                     <input type="number" id="elevation-step" value="10" min="1" max="30">
                 </div>
                 <div class="setting-row">
+                    <label>Slack Factor:</label>
+                    <span id="coord-slack-display" style="font-size:1.2em; color:#00d4ff; font-weight:bold;">0.60</span>
+                    <span style="color:#888; font-size:0.85em;">(auto: decreases with elevation)</span>
+                </div>
+                <div class="setting-row">
                     <label>Speed (us):</label>
                     <input type="range" id="coord-speed-slider" min="100" max="5000" value="1000">
                     <input type="number" id="coord-speed-value" value="1000" min="100" max="5000">
@@ -907,6 +915,11 @@ HTML_INTERFACE = """<!DOCTYPE html>
                 <button class="ctrl-home-btn" id="ctrl-home-btn" onclick="ctrlHome()">HOME</button>
 
                 <div class="settings-panel" style="width:100%;">
+                    <div class="setting-row">
+                        <label>Slack Factor:</label>
+                        <span id="ctrl-slack-display" style="font-size:1.2em; color:#00d4ff; font-weight:bold;">0.60</span>
+                        <span style="color:#888; font-size:0.85em;">(auto)</span>
+                    </div>
                     <div class="setting-row">
                         <label>Speed (us):</label>
                         <input type="range" id="ctrl-speed-slider" min="100" max="5000" value="1000">
@@ -1083,6 +1096,7 @@ HTML_INTERFACE = """<!DOCTYPE html>
                 if (data.success) {
                     document.getElementById('azimuth-value').textContent = Math.round(data.azimuth) + '\u00B0';
                     document.getElementById('elevation-value').textContent = Math.round(data.elevation);
+                    if (data.slack_factor !== undefined) document.getElementById('coord-slack-display').textContent = data.slack_factor.toFixed(2);
                     setStatus('Rotation complete', 'success');
                 } else {
                     setStatus('Failed: ' + (data.error || 'Unknown error'), 'error');
@@ -1109,6 +1123,7 @@ HTML_INTERFACE = """<!DOCTYPE html>
                 if (data.success) {
                     document.getElementById('azimuth-value').textContent = Math.round(data.azimuth) + '\u00B0';
                     document.getElementById('elevation-value').textContent = Math.round(data.elevation);
+                    if (data.slack_factor !== undefined) document.getElementById('coord-slack-display').textContent = data.slack_factor.toFixed(2);
                     setStatus('Tilt complete', 'success');
                 } else {
                     setStatus('Failed: ' + (data.error || 'Unknown error'), 'error');
@@ -1132,6 +1147,7 @@ HTML_INTERFACE = """<!DOCTYPE html>
                 if (data.success) {
                     document.getElementById('azimuth-value').textContent = Math.round(data.azimuth) + '\u00B0';
                     document.getElementById('elevation-value').textContent = Math.round(data.elevation);
+                    if (data.slack_factor !== undefined) document.getElementById('coord-slack-display').textContent = data.slack_factor.toFixed(2);
                     setStatus('Returned to center', 'success');
                 } else {
                     setStatus('Failed: ' + (data.error || 'Unknown error'), 'error');
@@ -1184,6 +1200,9 @@ HTML_INTERFACE = """<!DOCTYPE html>
                         }
                         if (msg.elevation !== undefined) {
                             document.getElementById('ctrl-elevation').textContent = Math.round(msg.elevation);
+                        }
+                        if (msg.slack_factor !== undefined) {
+                            document.getElementById('ctrl-slack-display').textContent = msg.slack_factor.toFixed(2);
                         }
                     }
                 } catch(e) {}

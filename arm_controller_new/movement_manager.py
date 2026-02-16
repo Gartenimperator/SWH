@@ -115,7 +115,8 @@ class MovementManager:
             await send_fn(json.dumps({
                 "type": "homed",
                 "azimuth": pos["azimuth"],
-                "elevation": pos["elevation"]
+                "elevation": pos["elevation"],
+                "slack_factor": pos["slack_factor"]
             }))
         except Exception as e:
             print(f"Home error: {e}")
@@ -133,7 +134,8 @@ class MovementManager:
             "type": "state",
             "state": self._state,
             "azimuth": pos["azimuth"],
-            "elevation": pos["elevation"]
+            "elevation": pos["elevation"],
+            "slack_factor": pos["slack_factor"]
         }
 
     async def _movement_loop(self):
@@ -180,7 +182,8 @@ class MovementManager:
                     await send(json.dumps({
                         "type": "position",
                         "azimuth": pos["azimuth"],
-                        "elevation": pos["elevation"]
+                        "elevation": pos["elevation"],
+                        "slack_factor": pos["slack_factor"]
                     }))
                     last_update = now
 
@@ -195,7 +198,8 @@ class MovementManager:
                     await send(json.dumps({
                         "type": "stopped",
                         "azimuth": pos["azimuth"],
-                        "elevation": pos["elevation"]
+                        "elevation": pos["elevation"],
+                        "slack_factor": pos["slack_factor"]
                     }))
                 except Exception:
                     pass

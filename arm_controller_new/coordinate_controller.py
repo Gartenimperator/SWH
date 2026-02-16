@@ -2,7 +2,7 @@
 # Handles spherical coordinate transformations for the tripod cable-driven mechanism
 
 import math
-from config import MOTOR_ANGLES, STEPS_PER_DEGREE, ELEVATION_LIMIT
+from config import MOTOR_ANGLES, STEPS_PER_DEGREE, ELEVATION_LIMIT, SLACK_AT_CENTER, SLACK_AT_LIMIT
 
 
 class CoordinateController:
@@ -17,8 +17,7 @@ class CoordinateController:
     def __init__(self):
         self.azimuth = 0.0          # Current azimuth in degrees (0-360)
         self.elevation = 0.0        # Current elevation (arbitrary units)
-        self._motor_positions = {'x': 0, 'y': 0, 'z': 0}  # Accumulated motor positions
-        self._center_offsets = {'x': 0, 'y': 0, 'z': 0}   # Offsets from calibration
+        self._motor_positions = {'x': 0, 'y': 0, 'z': 0}  # Actual motor positions (with slack applied)
 
     def rotate(self, delta_degrees):
         """Rotate azimuth by delta_degrees, return motor step deltas.
@@ -47,10 +46,19 @@ class CoordinateController:
     def home(self):
         """Return to center position (0, 0).
 
+        Directly reverses actual motor positions — no slack model needed
+        since we're returning to the known physical center.
+
         Returns:
             Dict of motor step deltas {'x': int, 'y': int, 'z': int}
         """
-        return self._move_to(0, 0)
+        deltas = {}
+        for motor in ['x', 'y', 'z']:
+            deltas[motor] = -self._motor_positions[motor]
+        self.azimuth = 0.0
+        self.elevation = 0.0
+        self._motor_positions = {'x': 0, 'y': 0, 'z': 0}
+        return deltas
 
     def set_center(self):
         """Mark current physical position as the new center (origin).
@@ -67,16 +75,37 @@ class CoordinateController:
         """Get current coordinate state.
 
         Returns:
-            Dict with 'azimuth', 'elevation', and 'motor_positions'
+            Dict with 'azimuth', 'elevation', 'motor_positions', and 'slack_factor'
         """
         return {
             'azimuth': self.azimuth,
             'elevation': self.elevation,
-            'motor_positions': self._motor_positions.copy()
+            'motor_positions': self._motor_positions.copy(),
+            'slack_factor': self._compute_slack_factor(self.elevation)
         }
+
+    def _compute_slack_factor(self, elevation):
+        """Compute non-linear slack factor based on elevation magnitude.
+
+        Interpolates linearly from SLACK_AT_CENTER (near 0) to
+        SLACK_AT_LIMIT (at max elevation).
+
+        Args:
+            elevation: Current elevation value
+
+        Returns:
+            Slack factor between SLACK_AT_LIMIT and SLACK_AT_CENTER
+        """
+        t = min(abs(elevation) / ELEVATION_LIMIT, 1.0)
+        return SLACK_AT_CENTER - (SLACK_AT_CENTER - SLACK_AT_LIMIT) * t
 
     def _move_to(self, new_azimuth, new_elevation):
         """Calculate and apply movement to new position.
+
+        Computes deltas from actual motor positions to ideal target.
+        Slack is applied per-motor: only when a release would take
+        that motor further from its rest position (0). When a motor
+        releases toward 0, the core helps spring back — no slack needed.
 
         Args:
             new_azimuth: Target azimuth in degrees
@@ -85,32 +114,32 @@ class CoordinateController:
         Returns:
             Dict of motor step deltas {'x': int, 'y': int, 'z': int}
         """
-        new_positions = self._calculate_positions(new_azimuth, new_elevation)
+        ideal_new = self._calculate_ideal_positions(new_azimuth, new_elevation)
+        slack = self._compute_slack_factor(new_elevation)
 
-        # Calculate deltas (difference from current position)
         deltas = {}
         for motor in ['x', 'y', 'z']:
-            deltas[motor] = new_positions[motor] - self._motor_positions[motor]
+            # Delta from actual position to ideal target
+            delta = ideal_new[motor] - self._motor_positions[motor]
+            # Apply slack only when releasing AND moving further from rest (0)
+            if delta < 0:
+                new_pos = self._motor_positions[motor] + delta
+                if abs(new_pos) > abs(self._motor_positions[motor]):
+                    delta = int(delta * slack)
+            deltas[motor] = delta
 
-        # Update state
+        # Update state — track actual motor positions
         self.azimuth = new_azimuth
         self.elevation = new_elevation
-        self._motor_positions = new_positions
+        for motor in ['x', 'y', 'z']:
+            self._motor_positions[motor] += deltas[motor]
 
         return deltas
 
-    def _calculate_positions(self, azimuth, elevation):
-        """Calculate motor positions for given spherical coordinates.
+    def _calculate_ideal_positions(self, azimuth, elevation):
+        """Calculate ideal motor positions (pure geometry, no slack).
 
         Uses the formula: position = elevation * cos(azimuth - motor_angle)
-
-        For a tripod mechanism:
-        - Motor X at 0 degrees: pulls toward 0 degree direction
-        - Motor Y at 120 degrees: pulls toward 120 degree direction
-        - Motor Z at 240 degrees: pulls toward 240 degree direction
-
-        When elevation > 0 and azimuth points toward a motor, that motor
-        has positive position (releases), opposite motor has negative (pulls).
 
         Args:
             azimuth: Direction in degrees (0-360)
@@ -124,7 +153,6 @@ class CoordinateController:
 
         for motor, angle in MOTOR_ANGLES.items():
             angle_rad = math.radians(angle)
-            # Calculate position based on projection of tilt direction onto motor axis
             position = elevation * math.cos(azimuth_rad - angle_rad) * STEPS_PER_DEGREE
             positions[motor] = int(position)
 

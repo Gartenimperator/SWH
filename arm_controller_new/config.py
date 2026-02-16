@@ -39,7 +39,13 @@ MOTOR_ANGLES = {'x': 0, 'y': 120, 'z': 240}
 ROTATION_STEP_DEGREES = 15    # Degrees per rotation button press
 ELEVATION_STEP_UNITS = 10     # Elevation change per button press
 STEPS_PER_DEGREE = 5          # Motor steps per degree of tilt (tunable)
-ELEVATION_LIMIT = 30          # Maximum elevation magnitude (±30)
+ELEVATION_LIMIT = 60          # Maximum elevation magnitude (±30)
+
+# Slack compensation for semi-rigid core
+# The core resists deflection, so releasing motors should give less cable.
+# Slack factor decreases (less release) as elevation increases.
+SLACK_AT_CENTER = 0.5         # Slack factor near 0 elevation
+SLACK_AT_LIMIT = 0.2          # Slack factor at max elevation
 
 # Continuous movement settings (WebSocket hold-to-move)
 CONTINUOUS_ROTATE_INCREMENT = 1    # Degrees per loop cycle
