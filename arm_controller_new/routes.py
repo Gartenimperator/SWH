@@ -584,6 +584,120 @@ HTML_INTERFACE = """<!DOCTYPE html>
         }
         .status.success { background: #1b4332; }
         .status.error { background: #5c1a1a; }
+
+        /* Controller Tab */
+        .ws-indicator {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 15px;
+            font-size: 0.9em;
+        }
+        .ws-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #e94560;
+            transition: background 0.3s;
+        }
+        .ws-dot.connected {
+            background: #27ae60;
+        }
+        .controller-section {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+        }
+        .slider-area {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 30px;
+        }
+        .slider-track {
+            position: relative;
+            background: #16213e;
+            border: 2px solid #0f3460;
+            border-radius: 10px;
+            touch-action: none;
+            user-select: none;
+        }
+        .slider-track.vertical {
+            width: 60px;
+            height: 250px;
+        }
+        .slider-track.horizontal {
+            width: 280px;
+            height: 60px;
+        }
+        .slider-thumb {
+            position: absolute;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #00d4ff, #0f3460);
+            border: 2px solid #00d4ff;
+            cursor: grab;
+            touch-action: none;
+            transition: none;
+        }
+        .slider-thumb.snap {
+            transition: top 0.2s ease-out, left 0.2s ease-out;
+        }
+        .slider-thumb:active {
+            cursor: grabbing;
+        }
+        .slider-group {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 6px;
+        }
+        .slider-label {
+            font-size: 0.8em;
+            color: #888;
+            text-align: center;
+        }
+        .slider-end-labels {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.75em;
+            color: #666;
+        }
+        .slider-end-labels.vertical {
+            flex-direction: column;
+            height: 250px;
+        }
+        .slider-end-labels.horizontal {
+            width: 280px;
+        }
+        .slider-with-labels {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .ctrl-home-btn {
+            padding: 15px 40px;
+            background: linear-gradient(135deg, #27ae60, #16a085);
+            border: none;
+            border-radius: 10px;
+            color: white;
+            font-size: 1.1em;
+            font-weight: bold;
+            cursor: pointer;
+            transition: transform 0.1s, box-shadow 0.1s;
+        }
+        .ctrl-home-btn:hover {
+            box-shadow: 0 0 20px rgba(39, 174, 96, 0.5);
+        }
+        .ctrl-home-btn:active {
+            transform: scale(0.95);
+        }
+        .ctrl-home-btn:disabled {
+            background: #444;
+            cursor: not-allowed;
+        }
     </style>
 </head>
 <body>
@@ -594,6 +708,7 @@ HTML_INTERFACE = """<!DOCTYPE html>
         <div class="tab-nav">
             <button class="tab-btn active" onclick="switchTab('calibration')">Calibration</button>
             <button class="tab-btn" onclick="switchTab('coordinate')">Coordinate Mode</button>
+            <button class="tab-btn" onclick="switchTab('controller')">Controller</button>
         </div>
 
         <!-- Calibration Tab -->
@@ -723,23 +838,11 @@ HTML_INTERFACE = """<!DOCTYPE html>
             <div class="settings-panel" style="margin-top: 20px;">
                 <div class="setting-row">
                     <label>Rotation Step:</label>
-                    <select id="rotation-step">
-                        <option value="5">5</option>
-                        <option value="10">10</option>
-                        <option value="15" selected>15</option>
-                        <option value="30">30</option>
-                        <option value="45">45</option>
-                        <option value="45">330</option>
-                    </select>
+                    <input type="number" id="rotation-step" value="15" min="1" max="360">
                 </div>
                 <div class="setting-row">
                     <label>Elevation Step:</label>
-                    <select id="elevation-step">
-                        <option value="5">5</option>
-                        <option value="10" selected>10</option>
-                        <option value="20">20</option>
-                        <option value="30">30</option>
-                    </select>
+                    <input type="number" id="elevation-step" value="10" min="1" max="30">
                 </div>
                 <div class="setting-row">
                     <label>Speed (us):</label>
@@ -753,20 +856,94 @@ HTML_INTERFACE = """<!DOCTYPE html>
             </div>
         </div>
 
+        <!-- Controller Tab -->
+        <div id="tab-controller" class="tab-content">
+            <div class="ws-indicator">
+                <div class="ws-dot" id="ws-dot"></div>
+                <span id="ws-status-text">Disconnected</span>
+            </div>
+
+            <div class="position-display">
+                <h3>Position</h3>
+                <div class="position-values">
+                    <div class="position-item">
+                        <div class="label">Azimuth</div>
+                        <div class="value" id="ctrl-azimuth">--</div>
+                    </div>
+                    <div class="position-item">
+                        <div class="label">Elevation</div>
+                        <div class="value" id="ctrl-elevation">--</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="controller-section">
+                <!-- Tilt (vertical) slider -->
+                <div class="slider-group">
+                    <div class="slider-label">Tilt</div>
+                    <div class="slider-with-labels">
+                        <div class="slider-end-labels vertical">
+                            <span>UP</span>
+                            <span>DOWN</span>
+                        </div>
+                        <div class="slider-track vertical" id="tilt-track">
+                            <div class="slider-thumb" id="tilt-thumb"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Rotation (horizontal) slider -->
+                <div class="slider-group">
+                    <div class="slider-label">Rotation</div>
+                    <div class="slider-track horizontal" id="rotate-track">
+                        <div class="slider-thumb" id="rotate-thumb"></div>
+                    </div>
+                    <div class="slider-end-labels horizontal">
+                        <span>LEFT</span>
+                        <span>RIGHT</span>
+                    </div>
+                </div>
+
+                <button class="ctrl-home-btn" id="ctrl-home-btn" onclick="ctrlHome()">HOME</button>
+
+                <div class="settings-panel" style="width:100%;">
+                    <div class="setting-row">
+                        <label>Speed (us):</label>
+                        <input type="range" id="ctrl-speed-slider" min="100" max="5000" value="1000">
+                        <input type="number" id="ctrl-speed-value" value="1000" min="100" max="5000">
+                    </div>
+                    <div class="speed-labels">
+                        <span>Fast (100us)</span>
+                        <span>Slow (5000us)</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <div class="status" id="status">Ready</div>
     </div>
 
     <script>
         // Tab switching
+        let activeTab = 'calibration';
         function switchTab(tabName) {
+            // Disconnect WS when leaving controller tab
+            if (activeTab === 'controller' && tabName !== 'controller') {
+                disconnectWS();
+            }
+
             document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
             document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
 
             document.querySelector('.tab-btn[onclick*="' + tabName + '"]').classList.add('active');
             document.getElementById('tab-' + tabName).classList.add('active');
+            activeTab = tabName;
 
             if (tabName === 'coordinate') {
                 updatePositionDisplay();
+            }
+            if (tabName === 'controller') {
+                connectWS();
             }
         }
 
@@ -962,6 +1139,182 @@ HTML_INTERFACE = """<!DOCTYPE html>
             } catch (e) {
                 setStatus('Error: ' + e.message, 'error');
             }
+        }
+
+        // Sync controller speed slider
+        const ctrlSpeedSlider = document.getElementById('ctrl-speed-slider');
+        const ctrlSpeedValue = document.getElementById('ctrl-speed-value');
+        ctrlSpeedSlider.oninput = () => ctrlSpeedValue.value = ctrlSpeedSlider.value;
+        ctrlSpeedValue.oninput = () => ctrlSpeedSlider.value = ctrlSpeedValue.value;
+
+        // === WebSocket Controller ===
+        let ws = null;
+        let wsReconnectTimer = null;
+
+        function connectWS() {
+            if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) return;
+            const host = window.location.hostname + ':' + window.location.port;
+            ws = new WebSocket('ws://' + host + '/ws');
+
+            ws.onopen = function() {
+                document.getElementById('ws-dot').classList.add('connected');
+                document.getElementById('ws-status-text').textContent = 'Connected';
+            };
+
+            ws.onclose = function() {
+                document.getElementById('ws-dot').classList.remove('connected');
+                document.getElementById('ws-status-text').textContent = 'Disconnected';
+                ws = null;
+                // Auto-reconnect if still on controller tab
+                if (activeTab === 'controller') {
+                    wsReconnectTimer = setTimeout(connectWS, 2000);
+                }
+            };
+
+            ws.onerror = function() {
+                ws.close();
+            };
+
+            ws.onmessage = function(ev) {
+                try {
+                    const msg = JSON.parse(ev.data);
+                    if (msg.type === 'state' || msg.type === 'position' || msg.type === 'stopped' || msg.type === 'homed') {
+                        if (msg.azimuth !== undefined) {
+                            document.getElementById('ctrl-azimuth').textContent = Math.round(msg.azimuth) + '\u00B0';
+                        }
+                        if (msg.elevation !== undefined) {
+                            document.getElementById('ctrl-elevation').textContent = Math.round(msg.elevation);
+                        }
+                    }
+                } catch(e) {}
+            };
+        }
+
+        function disconnectWS() {
+            if (wsReconnectTimer) { clearTimeout(wsReconnectTimer); wsReconnectTimer = null; }
+            if (ws) {
+                ws.close();
+                ws = null;
+            }
+        }
+
+        function wsSend(obj) {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify(obj));
+            }
+        }
+
+        // Safety: disconnect on page unload
+        window.addEventListener('beforeunload', function() {
+            disconnectWS();
+        });
+
+        // === Slider Drag Logic ===
+        function setupSlider(trackId, thumbId, axis, actionName) {
+            const track = document.getElementById(trackId);
+            const thumb = document.getElementById(thumbId);
+            const isVertical = axis === 'vertical';
+            let dragging = false;
+            let currentDirection = null;
+            const deadzone = 15; // pixels from center before triggering
+
+            function centerThumb() {
+                thumb.classList.add('snap');
+                if (isVertical) {
+                    thumb.style.top = (track.clientHeight / 2 - thumb.clientHeight / 2) + 'px';
+                    thumb.style.left = (track.clientWidth / 2 - thumb.clientWidth / 2) + 'px';
+                } else {
+                    thumb.style.left = (track.clientWidth / 2 - thumb.clientWidth / 2) + 'px';
+                    thumb.style.top = (track.clientHeight / 2 - thumb.clientHeight / 2) + 'px';
+                }
+                setTimeout(function() { thumb.classList.remove('snap'); }, 200);
+            }
+
+            // Initial position
+            centerThumb();
+
+            thumb.addEventListener('pointerdown', function(e) {
+                e.preventDefault();
+                dragging = true;
+                thumb.setPointerCapture(e.pointerId);
+                thumb.classList.remove('snap');
+            });
+
+            thumb.addEventListener('pointermove', function(e) {
+                if (!dragging) return;
+                e.preventDefault();
+
+                const rect = track.getBoundingClientRect();
+                const thumbSize = isVertical ? thumb.clientHeight : thumb.clientWidth;
+                const trackSize = isVertical ? rect.height : rect.width;
+                const center = trackSize / 2;
+
+                if (isVertical) {
+                    let y = e.clientY - rect.top - thumbSize / 2;
+                    y = Math.max(0, Math.min(trackSize - thumbSize, y));
+                    thumb.style.top = y + 'px';
+                    thumb.style.left = (track.clientWidth / 2 - thumb.clientWidth / 2) + 'px';
+
+                    const displacement = (center - thumbSize / 2) - y; // positive = up
+                    handleDisplacement(displacement);
+                } else {
+                    let x = e.clientX - rect.left - thumbSize / 2;
+                    x = Math.max(0, Math.min(trackSize - thumbSize, x));
+                    thumb.style.left = x + 'px';
+                    thumb.style.top = (track.clientHeight / 2 - thumb.clientHeight / 2) + 'px';
+
+                    const displacement = x - (center - thumbSize / 2); // positive = right
+                    handleDisplacement(displacement);
+                }
+            });
+
+            function handleDisplacement(displacement) {
+                let newDir = null;
+                if (displacement > deadzone) {
+                    newDir = 1;
+                } else if (displacement < -deadzone) {
+                    newDir = -1;
+                }
+
+                if (newDir !== currentDirection) {
+                    // Direction changed
+                    if (currentDirection !== null) {
+                        wsSend({cmd: 'stop'});
+                    }
+                    if (newDir !== null) {
+                        wsSend({
+                            cmd: 'start',
+                            action: actionName,
+                            direction: newDir,
+                            speed: parseInt(ctrlSpeedValue.value)
+                        });
+                    }
+                    currentDirection = newDir;
+                }
+            }
+
+            function release(e) {
+                if (!dragging) return;
+                dragging = false;
+
+                if (currentDirection !== null) {
+                    wsSend({cmd: 'stop'});
+                    currentDirection = null;
+                }
+                centerThumb();
+            }
+
+            thumb.addEventListener('pointerup', release);
+            thumb.addEventListener('pointercancel', release);
+        }
+
+        // Initialize sliders after DOM is ready
+        setupSlider('tilt-track', 'tilt-thumb', 'vertical', 'tilt');
+        setupSlider('rotate-track', 'rotate-thumb', 'horizontal', 'rotate');
+
+        // Home button for controller tab
+        function ctrlHome() {
+            wsSend({cmd: 'home', speed: parseInt(ctrlSpeedValue.value)});
         }
 
         // Initial position load

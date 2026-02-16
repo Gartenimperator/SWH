@@ -146,6 +146,7 @@ async def handle_client(reader, writer):
     """Handle incoming HTTP client connection.
 
     Routes requests to handlers defined in routes module.
+    Detects WebSocket upgrade requests on /ws and hands off to ws_handler.
     """
     try:
         # Read request with timeout
@@ -159,6 +160,20 @@ async def handle_client(reader, writer):
             writer.write(response)
             await writer.drain()
             return
+
+        # WebSocket upgrade detection
+        path = request['path'].split('?')[0]
+        if (path == '/ws'
+                and request['headers'].get('upgrade', '').lower() == 'websocket'):
+            ws_key = request['headers'].get('sec-websocket-key')
+            if ws_key:
+                from websocket import build_handshake_response
+                from ws_handler import handle_websocket_connection
+
+                writer.write(build_handshake_response(ws_key))
+                await writer.drain()
+                await handle_websocket_connection(reader, writer)
+                return
 
         # Handle CORS preflight
         if request['method'] == 'OPTIONS':

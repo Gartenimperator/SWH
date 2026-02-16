@@ -2,7 +2,7 @@
 # Handles spherical coordinate transformations for the tripod cable-driven mechanism
 
 import math
-from config import MOTOR_ANGLES, STEPS_PER_DEGREE
+from config import MOTOR_ANGLES, STEPS_PER_DEGREE, ELEVATION_LIMIT
 
 
 class CoordinateController:
@@ -11,7 +11,7 @@ class CoordinateController:
     The tentacle arm uses 3 motors positioned at 120 degrees apart (equilateral triangle).
     Each motor controls a tendon. This controller tracks:
     - Azimuth (theta): Direction the tentacle points (0-360 degrees)
-    - Elevation: Tilt magnitude from center (0 = centered, positive = tilted)
+    - Elevation: Tilt magnitude from center (0 = centered, positive/negative = tilted up/down)
     """
 
     def __init__(self):
@@ -41,7 +41,7 @@ class CoordinateController:
         Returns:
             Dict of motor step deltas {'x': int, 'y': int, 'z': int}
         """
-        new_elevation = max(0, self.elevation + delta_elevation)
+        new_elevation = max(-ELEVATION_LIMIT, min(ELEVATION_LIMIT, self.elevation + delta_elevation))
         return self._move_to(self.azimuth, new_elevation)
 
     def home(self):

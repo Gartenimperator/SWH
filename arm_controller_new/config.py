@@ -39,3 +39,9 @@ MOTOR_ANGLES = {'x': 0, 'y': 120, 'z': 240}
 ROTATION_STEP_DEGREES = 15    # Degrees per rotation button press
 ELEVATION_STEP_UNITS = 10     # Elevation change per button press
 STEPS_PER_DEGREE = 5          # Motor steps per degree of tilt (tunable)
+ELEVATION_LIMIT = 30          # Maximum elevation magnitude (±30)
+
+# Continuous movement settings (WebSocket hold-to-move)
+CONTINUOUS_ROTATE_INCREMENT = 1    # Degrees per loop cycle
+CONTINUOUS_TILT_INCREMENT = 1      # Elevation units per loop cycle
+POSITION_UPDATE_INTERVAL_MS = 200  # Position update frequency
