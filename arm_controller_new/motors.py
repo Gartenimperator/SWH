@@ -13,36 +13,27 @@ PIO_FREQ = 1_000_000
 @rp2.asm_pio(set_init=rp2.PIO.OUT_LOW, autopull=False, fifo_join=rp2.PIO.JOIN_TX)
 def stepper_pio():
     """PIO program for precise stepper pulse generation.
-
     Protocol: Send two values to FIFO:
       1. delay_cycles (half-period in PIO cycles, stored in ISR)
       2. step_count (number of pulses to generate)
-
     Uses ISR to preserve delay value across the step loop.
     At 1MHz PIO clock, 1 cycle = 1 microsecond.
     """
     wrap_target()
-    pull(block)              # Wait for delay value (blocks until data available)
-    mov(isr, osr)            # ISR = delay (preserved register)
+    pull(block)              # Wait for delay value
+    mov(isr, osr)            # ISR = delay (preserved)
     pull(block)              # Wait for step count
     mov(x, osr)              # X = step count
-
     label("step_loop")
-    jmp(not_x, "done")       # Exit if no steps remaining
-
     set(pins, 1)             # Step HIGH
     mov(y, isr)              # Y = delay countdown
     label("delay_high")
-    jmp(y_dec, "delay_high") # Count down (1 cycle per iteration)
-
+    jmp(y_dec, "delay_high") # Count down
     set(pins, 0)             # Step LOW
     mov(y, isr)              # Y = delay countdown
     label("delay_low")
     jmp(y_dec, "delay_low")  # Count down
-
-    jmp(x_dec, "step_loop")  # Decrement step count, continue
-
-    label("done")
+    jmp(x_dec, "step_loop")  # Decrement X and loop if not zero
     wrap()                   # Return to start, wait for next command
 
 
