@@ -122,7 +122,7 @@ class CoordinateController:
             # Delta from actual position to ideal target
             delta = ideal_new[motor] - self._motor_positions[motor]
             # Apply slack only when releasing AND moving further from rest (0)
-            if delta < 0:
+            if delta > 0:
                 new_pos = self._motor_positions[motor] + delta
                 if abs(new_pos) > abs(self._motor_positions[motor]):
                     delta = int(delta * slack)
