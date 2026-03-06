@@ -26,6 +26,13 @@ LED_RED_PIN   = 16
 LED_GREEN_PIN = 17
 LED_BLUE_PIN  = 18
 
+# Tension/slack detection buttons (one per motor, pressed = string under tension)
+# NOTE: pins 16/17/18 currently overlap with LED pins above — reassign as needed
+TENSION_BUTTON_PINS = {'x': 16, 'y': 17, 'z': 18}
+
+# Steps pulled per calibration iteration when taking up slack
+CALIBRATION_PULL_STEPS = 5
+
 # =============================================================================
 # MOTOR SETTINGS
 # =============================================================================

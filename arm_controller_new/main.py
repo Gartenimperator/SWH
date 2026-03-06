@@ -25,7 +25,10 @@ async def main():
     asyncio.create_task(led.run())
     asyncio.create_task(Joystick(bus).run())
     asyncio.create_task(Gamepad(bus).run())
-    asyncio.create_task(ArmController(bus, led).run())
+
+    arm = ArmController(bus, led)
+    arm.calibrate()
+    asyncio.create_task(arm.run())
 
     print("Tentacle Arm Controller ready.")
     while True:

@@ -3,11 +3,12 @@ try:
 except ImportError:
     import asyncio
 
+from machine import Pin
 from motors import move_multiple_steppers, move_stepper
 from coordinate_controller import get_controller
 from config import (DEFAULT_SPEED_US, ELEVATION_STEP_UNITS, ROTATION_STEP_DEGREES,
                     CLOCKWISE, COUNTERCLOCKWISE, GAMEPAD_MANUAL_STEPS,
-                    JOYSTICK_SAMPLE_DELAY)
+                    JOYSTICK_SAMPLE_DELAY, TENSION_BUTTON_PINS, CALIBRATION_PULL_STEPS)
 
 # LED mode shown when each motor is selected
 MOTOR_LED_MODES = {
@@ -25,6 +26,11 @@ class ArmController:
         self.debug = False
         self._nx = 0.0  # current joystick state, updated by events
         self._ny = 0.0
+        # Tension buttons: pressed (LOW with pull-up) = string is under tension
+        self._tension_buttons = {
+            motor: Pin(pin, Pin.IN, Pin.PULL_UP)
+            for motor, pin in TENSION_BUTTON_PINS.items()
+        }
 
     async def run(self):
         asyncio.create_task(self._move_loop())
@@ -88,10 +94,59 @@ class ArmController:
     def _on_motor_release(self, data):
         move_stepper(data['motor'], COUNTERCLOCKWISE, DEFAULT_SPEED_US, GAMEPAD_MANUAL_STEPS)
 
+    def calibrate(self):
+        """Pull each string until all tension buttons are pressed.
+
+        Steps all slack motors in small increments until every button reports
+        tension, then resets the coordinate origin to this physical position.
+        Does nothing if all strings are already tensioned.
+        """
+        import time
+
+        if all(self._is_under_tension(m) for m in ['x', 'y', 'z']):
+            print("[Arm] All strings tensioned — skipping calibration.")
+            return
+
+        print("[Arm] Calibrating — pulling slack strings...")
+        while True:
+            slack = [m for m in ['x', 'y', 'z'] if not self._is_under_tension(m)]
+            if not slack:
+                break
+            move_multiple_steppers(
+                [{'id': m, 'direction': CLOCKWISE, 'steps': CALIBRATION_PULL_STEPS} for m in slack],
+                speed_us=DEFAULT_SPEED_US,
+            )
+            time.sleep_ms(10)  # let button state settle
+
+        # This tensioned position is the physical center — reset origin
+        self._coord.set_center()
+        print("[Arm] Calibration complete.")
+
+    def _is_under_tension(self, motor):
+        """Return True if the tension button for this motor is pressed (string is taut)."""
+        btn = self._tension_buttons.get(motor)
+        if btn is None:
+            return True  # no button configured — assume tension
+        return btn.value() == 0  # pull-up: pressed = LOW
+
     def _execute_deltas(self, deltas):
-        motor_args = [
-            {'id': m, 'direction': 1 if d > 0 else 0, 'steps': abs(d)}
-            for m, d in deltas.items() if d != 0
-        ]
+        motor_args = []
+        skipped = {}
+        for m, d in deltas.items():
+            if d == 0:
+                continue
+            direction = 1 if d > 0 else 0
+            # Only release (COUNTERCLOCKWISE) if the string is currently under tension.
+            # If the button is not pressed the string already has slack — skip the release.
+            if direction == COUNTERCLOCKWISE and not self._is_under_tension(m):
+                skipped[m] = d
+                continue
+            motor_args.append({'id': m, 'direction': direction, 'steps': abs(d)})
+
+        # Undo the coord controller's position update for skipped releases so
+        # internal state stays consistent with what actually moved.
+        for m, d in skipped.items():
+            self._coord._motor_positions[m] -= d
+
         if motor_args:
             move_multiple_steppers(motor_args, speed_us=DEFAULT_SPEED_US)
