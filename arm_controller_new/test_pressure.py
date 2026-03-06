@@ -4,9 +4,9 @@ from machine import Pin
 import utime
 
 buttons = [
-    Pin(16, Pin.IN, Pin.PULL_UP),
-    Pin(17, Pin.IN, Pin.PULL_UP),
-    Pin(18, Pin.IN, Pin.PULL_UP),
+    Pin(10, Pin.IN, Pin.PULL_UP),
+    Pin(11, Pin.IN, Pin.PULL_UP),
+    Pin(12, Pin.IN, Pin.PULL_UP),
 ]
 
 last_states = [1, 1, 1]
@@ -21,6 +21,8 @@ def main():
             if state != last_states[i]:
                 if state == 0:
                     print(f"Button GP{16 + i} PRESSED")
+                if state == 1:
+                    print(f"Button GP{16 + i} RElease")
                 last_states[i] = state
         utime.sleep_ms(20)
 

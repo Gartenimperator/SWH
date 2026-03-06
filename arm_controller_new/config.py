@@ -22,13 +22,13 @@ GAMEPAD_SDA_PIN = 0
 GAMEPAD_SCL_PIN = 1
 
 # LED RGB (PWM channels, GND on hardware pin)
-LED_RED_PIN   = 16
-LED_GREEN_PIN = 17
-LED_BLUE_PIN  = 18
-
+LED_RED_PIN   = 19
+LED_GREEN_PIN = 20
+LED_BLUE_PIN  = 21
 # Tension/slack detection buttons (one per motor, pressed = string under tension)
 # NOTE: pins 16/17/18 currently overlap with LED pins above — reassign as needed
-TENSION_BUTTON_PINS = {'x': 16, 'y': 17, 'z': 18}
+TENSION_BUTTON_PINS = {'x': 10, 'y': 11, 'z': 12}
+#11->left 12-middle 13-right
 
 # Steps pulled per calibration iteration when taking up slack
 CALIBRATION_PULL_STEPS = 5
