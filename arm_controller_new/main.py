@@ -35,8 +35,7 @@ async def main():
         await asyncio.sleep(3600)
 
 
-if __name__ == '__main__':
-    try:
-        asyncio.run(main())
-    except KeyboardInterrupt:
-        print("\nShutting down...")
+try:
+    asyncio.run(main())
+except KeyboardInterrupt:
+    print("\nShutting down...")

@@ -27,8 +27,8 @@ LED_GREEN_PIN = 20
 LED_BLUE_PIN  = 21
 # Tension/slack detection buttons (one per motor, pressed = string under tension)
 # NOTE: pins 16/17/18 currently overlap with LED pins above — reassign as needed
-TENSION_BUTTON_PINS = {'x': 10, 'y': 11, 'z': 12}
-#11->left 12-middle 13-right
+TENSION_BUTTON_PINS = {'x': 11, 'y': 10, 'z': 12}
+#11-left-x 12-middle-z 10-right-y
 
 # Steps pulled per calibration iteration when taking up slack
 CALIBRATION_PULL_STEPS = 5
@@ -38,11 +38,11 @@ CALIBRATION_PULL_STEPS = 5
 # =============================================================================
 
 MOTOR_ALIASES   = {'x': 'motor1', 'y': 'motor2', 'z': 'motor3'}
-CLOCKWISE       = 1
-COUNTERCLOCKWISE = 0
+CLOCKWISE       = 0
+COUNTERCLOCKWISE = 1
 
 STEPS_PER_REV      = 200    # Steps per full revolution (NEMA17)
-DEFAULT_SPEED_US   = 1000   # Pulse half-period in microseconds
+DEFAULT_SPEED_US   = 2000   # Pulse half-period in microseconds
 MIN_SPEED_US       = 100    # Fastest (shortest delay)
 MAX_SPEED_US       = 5000   # Slowest (longest delay)
 DEFAULT_STEPS      = 100    # Default steps per jog
@@ -60,9 +60,14 @@ ELEVATION_LIMIT      = 50   # Maximum elevation magnitude (±60)
 ROTATION_STEP_DEGREES = 5   # Degrees per joystick step
 ELEVATION_STEP_UNITS  = 3   # Elevation units per joystick step
 
-# Slack compensation — core resists deflection, so releases give less cable
-SLACK_AT_CENTER = 0.15       # Slack factor near 0 elevation
-SLACK_AT_LIMIT  = 0       # Slack factor at max elevation
+# Slack compensation — multiplier applied to release steps (1.0 = no compensation)
+# Tune below 1.0 only if the arm physically overshoots during rotation
+SLACK_AT_CENTER = 1.0        # Slack factor near 0 elevation
+SLACK_AT_LIMIT  = 1.0        # Slack factor at max elevation
+
+# Retension is called every N move_loop iterations to avoid fighting rotation
+# while still preventing string uncoiling from prolonged slack
+RETENSION_INTERVAL = 5
 
 # =============================================================================
 # JOYSTICK CONTROL
@@ -79,5 +84,5 @@ JOYSTICK_DEADZONE     = 106  # Raw units around centre → output 0 (midpoint be
 # =============================================================================
 
 GAMEPAD_ADDRESS      = 0x57
-GAMEPAD_POLL_DELAY   = 0.05  # Seconds between button polls
+GAMEPAD_POLL_DELAY   = 0.1  # Seconds between button polls
 GAMEPAD_MANUAL_STEPS = 20    # Steps per UP/DOWN button event

@@ -8,7 +8,8 @@ from motors import move_multiple_steppers, move_stepper
 from coordinate_controller import get_controller
 from config import (DEFAULT_SPEED_US, ELEVATION_STEP_UNITS, ROTATION_STEP_DEGREES,
                     CLOCKWISE, COUNTERCLOCKWISE, GAMEPAD_MANUAL_STEPS,
-                    JOYSTICK_SAMPLE_DELAY, TENSION_BUTTON_PINS, CALIBRATION_PULL_STEPS)
+                    JOYSTICK_SAMPLE_DELAY, TENSION_BUTTON_PINS, CALIBRATION_PULL_STEPS,
+                    RETENSION_INTERVAL)
 
 # LED mode shown when each motor is selected
 MOTOR_LED_MODES = {
@@ -26,6 +27,7 @@ class ArmController:
         self.debug = False
         self._nx = 0.0  # current joystick state, updated by events
         self._ny = 0.0
+        self._retension_counter = 0
         # Tension buttons: pressed (LOW with pull-up) = string is under tension
         self._tension_buttons = {
             motor: Pin(pin, Pin.IN, Pin.PULL_UP)
@@ -50,6 +52,8 @@ class ArmController:
                 self._on_motor_pull(data)
             elif event == 'motor_release' and self.debug:
                 self._on_motor_release(data)
+            elif event == 'light_mode_next':
+                self._led.next_mode()
 
     async def _move_loop(self):
         """Continuously move the arm as long as the joystick is deflected."""
@@ -58,9 +62,11 @@ class ArmController:
                 self._execute_deltas(self._coord.tilt(int(self._nx * ELEVATION_STEP_UNITS)))
             if self._ny != 0:
                 self._execute_deltas(self._coord.rotate(int(-self._ny * ROTATION_STEP_DEGREES)))
+            self._retension_counter += 1
+            if self._retension_counter >= RETENSION_INTERVAL:
+                self._retension()
+                self._retension_counter = 0
             await asyncio.sleep(JOYSTICK_SAMPLE_DELAY)
-
-    # ------------------------------------------------------------------
 
     def _on_joystick(self, data):
         self._nx = data['nx']
@@ -82,6 +88,9 @@ class ArmController:
         else:
             self._execute_deltas(self._coord.home())
             print("[Arm] Homing")
+            self._retension()
+            self._coord.set_center()
+            print("[Arm] Recalibrated after home")
 
     def _on_motor_select(self, data):
         motor = data['motor']
@@ -94,21 +103,10 @@ class ArmController:
     def _on_motor_release(self, data):
         move_stepper(data['motor'], COUNTERCLOCKWISE, DEFAULT_SPEED_US, GAMEPAD_MANUAL_STEPS)
 
-    def calibrate(self):
-        """Pull each string until all tension buttons are pressed.
-
-        Steps all slack motors in small increments until every button reports
-        tension, then resets the coordinate origin to this physical position.
-        Does nothing if all strings are already tensioned.
-        """
+    def _retension(self):
         import time
-
-        if all(self._is_under_tension(m) for m in ['x', 'y', 'z']):
-            print("[Arm] All strings tensioned — skipping calibration.")
-            return
-
-        print("[Arm] Calibrating — pulling slack strings...")
-        while True:
+        slack = True
+        while slack:
             slack = [m for m in ['x', 'y', 'z'] if not self._is_under_tension(m)]
             if not slack:
                 break
@@ -116,8 +114,21 @@ class ArmController:
                 [{'id': m, 'direction': CLOCKWISE, 'steps': CALIBRATION_PULL_STEPS} for m in slack],
                 speed_us=DEFAULT_SPEED_US,
             )
+            for m in slack:
+                self._coord._motor_positions[m] -= CALIBRATION_PULL_STEPS
             time.sleep_ms(10)  # let button state settle
 
+    def calibrate(self):
+        """Pull each string until all tension buttons are pressed, then reset origin.
+
+        Called at startup. Does nothing if all strings are already tensioned.
+        """
+        if all(self._is_under_tension(m) for m in ['x', 'y', 'z']):
+            print("[Arm] All strings tensioned — skipping calibration.")
+            return
+
+        print("[Arm] Calibrating — pulling slack strings...")
+        self._retension()
         # This tensioned position is the physical center — reset origin
         self._coord.set_center()
         print("[Arm] Calibration complete.")
