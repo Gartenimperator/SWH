@@ -12,11 +12,11 @@ from config import LED_RED_PIN, LED_GREEN_PIN, LED_BLUE_PIN
 
 # (name, display_label)
 MODES = [
-    "off",
+    "breathing_white",
+    "white",
     "red",
     "green",
     "blue",
-    "white",
     "cyan",
     "magenta",
     "yellow",
@@ -26,7 +26,6 @@ MODES = [
     "blink_white",
     "police",
     "rainbow",
-    "breathing_white",
     "breathing_red",
     "candle",
 ]

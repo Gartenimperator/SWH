@@ -4,6 +4,10 @@
 
 from machine import Pin
 import rp2
+try:
+    import uasyncio as asyncio
+except ImportError:
+    import asyncio
 from config import MOTORS, MOTOR_ALIASES, DEFAULT_SPEED_US, INTERLACE_STEP_SIZE
 
 # PIO clock frequency (1MHz = 1 cycle per microsecond for easy timing)
@@ -78,12 +82,11 @@ class StepperMotor:
         self.sm.put(delay_us)
         self.sm.put(steps)
 
-    def pulse(self, delay_us):
-        """Generate one step pulse with given delay (blocking for compatibility)."""
+    async def pulse(self, delay_us):
+        """Generate one step pulse with given delay."""
         self.step_async(1, delay_us)
         # Brief wait for single step to complete
-        import time
-        time.sleep_us(delay_us * 2 + 10)
+        await asyncio.sleep((delay_us * 2 + 10) / 1_000_000)
 
 
 # Global motor instances
@@ -106,7 +109,7 @@ def get_motor(motor_id):
     return _motors.get(motor_id)
 
 
-def move_stepper(motor_id, direction, speed_us, steps):
+async def move_stepper(motor_id, direction, speed_us, steps):
     """Move a single stepper motor.
 
     Args:
@@ -123,13 +126,12 @@ def move_stepper(motor_id, direction, speed_us, steps):
     motor.step_async(steps, speed_us)
 
     # Wait for movement to complete (total time = steps * 2 * delay)
-    import time
-    time.sleep_us(steps * speed_us * 2 + 100)
+    await asyncio.sleep((steps * speed_us * 2 + 100) / 1_000_000)
 
     return True
 
 
-def move_multiple_steppers(motor_args, speed_us=None, interlace_size=None):
+async def move_multiple_steppers(motor_args, speed_us=None, interlace_size=None):
     """Move multiple steppers simultaneously using PIO hardware timing.
 
     All motors start at the same time and run in parallel via their
@@ -146,8 +148,6 @@ def move_multiple_steppers(motor_args, speed_us=None, interlace_size=None):
     Returns:
         True if successful, False otherwise
     """
-    import time
-
     if speed_us is None:
         speed_us = DEFAULT_SPEED_US
 
@@ -176,7 +176,7 @@ def move_multiple_steppers(motor_args, speed_us=None, interlace_size=None):
         m['motor'].step_async(m['steps'], speed_us)
 
     # Wait for longest movement to complete
-    time.sleep_us(max_steps * speed_us * 2 + 100)
+    await asyncio.sleep((max_steps * speed_us * 2 + 100) / 1_000_000)
 
     return True
 

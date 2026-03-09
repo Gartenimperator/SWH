@@ -62,12 +62,12 @@ ELEVATION_STEP_UNITS  = 3   # Elevation units per joystick step
 
 # Slack compensation — multiplier applied to release steps (1.0 = no compensation)
 # Tune below 1.0 only if the arm physically overshoots during rotation
-SLACK_AT_CENTER = 1.0        # Slack factor near 0 elevation
-SLACK_AT_LIMIT  = 1.0        # Slack factor at max elevation
+SLACK_AT_CENTER = 0.6        # Slack factor near 0 elevation
+SLACK_AT_LIMIT  = 0.2        # Slack factor at max elevation
 
 # Retension is called every N move_loop iterations to avoid fighting rotation
 # while still preventing string uncoiling from prolonged slack
-RETENSION_INTERVAL = 5
+RETENSION_INTERVAL = 1
 
 # =============================================================================
 # JOYSTICK CONTROL

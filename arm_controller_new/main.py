@@ -12,9 +12,12 @@ from arm_controller import ArmController
 from led_controller import LEDController
 from joystick_controller import Joystick
 from touchpad_controller import Gamepad
+from machine import Pin
 
+led_onboard = Pin("LED", Pin.OUT)
 
 async def main():
+    led_onboard.on()
     print("Initializing motors...")
     init_motors()
     print("Motors initialized.")
@@ -27,7 +30,7 @@ async def main():
     asyncio.create_task(Gamepad(bus).run())
 
     arm = ArmController(bus, led)
-    arm.calibrate()
+    await arm.calibrate()
     asyncio.create_task(arm.run())
 
     print("Tentacle Arm Controller ready.")

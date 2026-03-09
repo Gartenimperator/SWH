@@ -10,9 +10,12 @@ try:
     import uasyncio as asyncio
 except ImportError:
     import asyncio
+import time
 from machine import ADC, Pin
 from config import (JOYSTICK_X_PIN, JOYSTICK_Y_PIN, JOYSTICK_SW_PIN,
                     JOYSTICK_SAMPLE_DELAY, JOYSTICK_CENTER, JOYSTICK_DEADZONE)
+
+DOUBLE_CLICK_WINDOW_MS = 400
 
 
 class Joystick:
@@ -24,6 +27,9 @@ class Joystick:
         self.x = 0
         self.y = 0
         self.pressed = False
+        self._prev_pressed = False
+        self._click_count = 0
+        self._last_click_ms = 0
 
     def _read_adc(self, adc):
         """Read an ADC and return a 0..1023 integer."""
@@ -60,4 +66,22 @@ class Joystick:
             if nx != prev_nx or ny != prev_ny:
                 self._bus.emit('joystick', {'nx': nx, 'ny': ny})
                 prev_nx, prev_ny = nx, ny
+
+            now = time.ticks_ms()
+
+            # Detect rising edge (button just pressed)
+            if self.pressed and not self._prev_pressed:
+                if self._click_count == 1 and time.ticks_diff(now, self._last_click_ms) < DOUBLE_CLICK_WINDOW_MS:
+                    self._bus.emit('light_mode_next', {})
+                    self._click_count = 0
+                else:
+                    self._click_count = 1
+                    self._last_click_ms = now
+
+            # Single click timeout: emit home if window has passed with one click
+            if self._click_count == 1 and time.ticks_diff(now, self._last_click_ms) >= DOUBLE_CLICK_WINDOW_MS:
+                self._bus.emit('home', {})
+                self._click_count = 0
+
+            self._prev_pressed = self.pressed
             await asyncio.sleep(JOYSTICK_SAMPLE_DELAY)

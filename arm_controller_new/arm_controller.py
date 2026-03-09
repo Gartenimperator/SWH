@@ -43,15 +43,15 @@ class ArmController:
             if event == 'joystick':
                 self._on_joystick(data)
             elif event == 'home':
-                self._on_home()
+                await self._on_home()
             elif event == 'debug_toggle':
                 self._on_debug_toggle()
             elif event == 'motor_select' and self.debug:
                 self._on_motor_select(data)
             elif event == 'motor_pull' and self.debug:
-                self._on_motor_pull(data)
+                await self._on_motor_pull(data)
             elif event == 'motor_release' and self.debug:
-                self._on_motor_release(data)
+                await self._on_motor_release(data)
             elif event == 'light_mode_next':
                 self._led.next_mode()
 
@@ -59,12 +59,12 @@ class ArmController:
         """Continuously move the arm as long as the joystick is deflected."""
         while True:
             if self._nx != 0:
-                self._execute_deltas(self._coord.tilt(int(self._nx * ELEVATION_STEP_UNITS)))
+                await self._execute_deltas(self._coord.tilt(int(self._nx * ELEVATION_STEP_UNITS)))
             if self._ny != 0:
-                self._execute_deltas(self._coord.rotate(int(-self._ny * ROTATION_STEP_DEGREES)))
+                await self._execute_deltas(self._coord.rotate(int(-self._ny * ROTATION_STEP_DEGREES)))
             self._retension_counter += 1
             if self._retension_counter >= RETENSION_INTERVAL:
-                self._retension()
+                await self._retension()
                 self._retension_counter = 0
             await asyncio.sleep(JOYSTICK_SAMPLE_DELAY)
 
@@ -81,14 +81,14 @@ class ArmController:
             self._led.set_mode('off')
             print("[Arm] Debug mode OFF")
 
-    def _on_home(self):
+    async def _on_home(self):
         if self.debug:
             self._coord.set_center()
             print("[Arm] Center set to current position")
         else:
-            self._execute_deltas(self._coord.home())
+            await self._execute_deltas(self._coord.home())
             print("[Arm] Homing")
-            self._retension()
+            await self._retension()
             self._coord.set_center()
             print("[Arm] Recalibrated after home")
 
@@ -97,28 +97,27 @@ class ArmController:
         self._led.set_mode(MOTOR_LED_MODES.get(motor, 'white'))
         print(f"[Arm] Motor {motor} selected")
 
-    def _on_motor_pull(self, data):
-        move_stepper(data['motor'], CLOCKWISE, DEFAULT_SPEED_US, GAMEPAD_MANUAL_STEPS)
+    async def _on_motor_pull(self, data):
+        await move_stepper(data['motor'], CLOCKWISE, DEFAULT_SPEED_US, GAMEPAD_MANUAL_STEPS)
 
-    def _on_motor_release(self, data):
-        move_stepper(data['motor'], COUNTERCLOCKWISE, DEFAULT_SPEED_US, GAMEPAD_MANUAL_STEPS)
+    async def _on_motor_release(self, data):
+        await move_stepper(data['motor'], COUNTERCLOCKWISE, DEFAULT_SPEED_US, GAMEPAD_MANUAL_STEPS)
 
-    def _retension(self):
-        import time
+    async def _retension(self):
         slack = True
         while slack:
             slack = [m for m in ['x', 'y', 'z'] if not self._is_under_tension(m)]
             if not slack:
                 break
-            move_multiple_steppers(
+            await move_multiple_steppers(
                 [{'id': m, 'direction': CLOCKWISE, 'steps': CALIBRATION_PULL_STEPS} for m in slack],
                 speed_us=DEFAULT_SPEED_US,
             )
             for m in slack:
                 self._coord._motor_positions[m] -= CALIBRATION_PULL_STEPS
-            time.sleep_ms(10)  # let button state settle
+            await asyncio.sleep(0.010)  # let button state settle
 
-    def calibrate(self):
+    async def calibrate(self):
         """Pull each string until all tension buttons are pressed, then reset origin.
 
         Called at startup. Does nothing if all strings are already tensioned.
@@ -128,7 +127,7 @@ class ArmController:
             return
 
         print("[Arm] Calibrating — pulling slack strings...")
-        self._retension()
+        await self._retension()
         # This tensioned position is the physical center — reset origin
         self._coord.set_center()
         print("[Arm] Calibration complete.")
@@ -140,7 +139,7 @@ class ArmController:
             return True  # no button configured — assume tension
         return btn.value() == 0  # pull-up: pressed = LOW
 
-    def _execute_deltas(self, deltas):
+    async def _execute_deltas(self, deltas):
         motor_args = []
         skipped = {}
         for m, d in deltas.items():
@@ -160,4 +159,4 @@ class ArmController:
             self._coord._motor_positions[m] -= d
 
         if motor_args:
-            move_multiple_steppers(motor_args, speed_us=DEFAULT_SPEED_US)
+            await move_multiple_steppers(motor_args, speed_us=DEFAULT_SPEED_US)
