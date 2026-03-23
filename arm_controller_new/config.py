@@ -53,7 +53,7 @@ INTERLACE_STEP_SIZE = 10    # Steps per interlace cycle
 # =============================================================================
 
 # Motor angular positions (equilateral triangle, 120° apart)
-MOTOR_ANGLES = {'x': 0, 'y': 120, 'z': 240}
+MOTOR_ANGLES = {'x': 60, 'y': 180, 'z': 300}
 
 STEPS_PER_DEGREE     = 5    # Motor steps per degree of tilt (tunable)
 ELEVATION_LIMIT      = 50   # Maximum elevation magnitude (±60)

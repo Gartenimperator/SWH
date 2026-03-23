@@ -3,13 +3,14 @@ try:
 except ImportError:
     import asyncio
 
+import math
 from machine import Pin
 from motors import move_multiple_steppers, move_stepper
 from coordinate_controller import get_controller
-from config import (DEFAULT_SPEED_US, ELEVATION_STEP_UNITS, ROTATION_STEP_DEGREES,
-                    CLOCKWISE, COUNTERCLOCKWISE, GAMEPAD_MANUAL_STEPS,
-                    JOYSTICK_SAMPLE_DELAY, TENSION_BUTTON_PINS, CALIBRATION_PULL_STEPS,
-                    RETENSION_INTERVAL)
+from config import (DEFAULT_SPEED_US, ELEVATION_LIMIT, ELEVATION_STEP_UNITS,
+                    ROTATION_STEP_DEGREES, CLOCKWISE, COUNTERCLOCKWISE,
+                    GAMEPAD_MANUAL_STEPS, JOYSTICK_SAMPLE_DELAY, TENSION_BUTTON_PINS,
+                    CALIBRATION_PULL_STEPS, RETENSION_INTERVAL)
 
 # LED mode shown when each motor is selected
 MOTOR_LED_MODES = {
@@ -56,12 +57,42 @@ class ArmController:
                 self._led.next_mode()
 
     async def _move_loop(self):
-        """Continuously move the arm as long as the joystick is deflected."""
+        """Seek the 8-position target derived from joystick direction.
+
+        Joystick positions map to azimuth (0° = forward = +ny) at full tilt:
+            Forward       (ny=+1, nx= 0) →   0°
+            Forward-right (ny=+1, nx=+1) →  45°
+            Right         (ny= 0, nx=+1) →  90°
+            Back-right    (ny=-1, nx=+1) → 135°
+            Back          (ny=-1, nx= 0) → 180°
+            Back-left     (ny=-1, nx=-1) → 225°
+            Left          (ny= 0, nx=-1) → 270°
+            Forward-left  (ny=+1, nx=-1) → 315°
+            Center        (ny= 0, nx= 0) → elevation 0 (upright)
+        """
         while True:
-            if self._nx != 0:
-                await self._execute_deltas(self._coord.tilt(int(self._nx * ELEVATION_STEP_UNITS)))
-            if self._ny != 0:
-                await self._execute_deltas(self._coord.rotate(int(-self._ny * ROTATION_STEP_DEGREES)))
+            if self._nx != 0 or self._ny != 0:
+                # First: move azimuth toward target
+                while self._nx != 0 or self._ny != 0:
+                    target_az = math.degrees(math.atan2(self._nx, self._ny)) % 360
+                    az_diff = ((target_az - self._coord.azimuth + 180) % 360) - 180
+                    if abs(az_diff) < 1:
+                        break
+                    az_step = min(ROTATION_STEP_DEGREES, abs(az_diff))
+                    if az_diff < 0:
+                        az_step = -az_step
+                    await self._execute_deltas(self._coord.rotate(int(az_step)))
+
+                # Then: move elevation toward target
+                while self._nx != 0 or self._ny != 0:
+                    el_diff = float(ELEVATION_LIMIT) - self._coord.elevation
+                    if abs(el_diff) < 1:
+                        break
+                    el_step = min(ELEVATION_STEP_UNITS, abs(el_diff))
+                    if el_diff < 0:
+                        el_step = -el_step
+                    await self._execute_deltas(self._coord.tilt(int(el_step)))
+
             self._retension_counter += 1
             if self._retension_counter >= RETENSION_INTERVAL:
                 await self._retension()

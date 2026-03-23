@@ -136,6 +136,22 @@ class CoordinateController:
 
         return deltas
 
+    def seek(self, target_azimuth, target_elevation):
+        """Move toward a target (azimuth, elevation) in one step.
+
+        Used by the 8-position joystick steering model to jump directly to the
+        target rather than nudging incrementally.
+
+        Args:
+            target_azimuth: Target azimuth in degrees (0-360)
+            target_elevation: Target elevation (clamped to ±ELEVATION_LIMIT)
+
+        Returns:
+            Dict of motor step deltas {'x': int, 'y': int, 'z': int}
+        """
+        target_elevation = max(-ELEVATION_LIMIT, min(ELEVATION_LIMIT, target_elevation))
+        return self._move_to(target_azimuth, target_elevation)
+
     def _calculate_ideal_positions(self, azimuth, elevation):
         """Calculate ideal motor positions (pure geometry, no slack).
 
